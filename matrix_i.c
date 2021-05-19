@@ -32,13 +32,17 @@ int matrix_init(double *matrix, int n, int k, int rank, int size) //matrix, size
     thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк этому процессу
 
     for (int i=0; i < thisProcessN; i++)
-    {        
+    {
+        printf("Pr #%d, i=%d, ie str=%d:   ", rank,i,size*i+rank);
         for (int j = 0; j < n; j++)
+        {
             matrix[i*n+j] = fun(k, n, size*i+rank, j);
+            printf("%lf    ", matrix[i*n+j]);
+        }
+        printf("\n");
+
     }
 
-    printf("Process #%d of %d \n", rank, size );
-    matrix_print(matrix, thisProcessN, n, n);
 
     /*for (int i = 0; i < n; i++) 
         if (size*j+rank < n)

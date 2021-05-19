@@ -1,6 +1,7 @@
 #include "matrix_solve.h"
 #include <math.h>
 #include <stdio.h>
+#include <mpi.h>
 
 int col_swap(double *matrix, int n, int p, int q)
 {
@@ -40,69 +41,170 @@ void debugout(double *matrix, double *b, int n)
     printf("\n");
 }
 
-int SLE_solve(double *matrix, double *b, int n, int *seq, double *b_copy)
+int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str, int rank, int size)
 {
-    int k;
-    double buf;
+    int col_max_id;
+    double buf, b_root, koeff;
+    int thisProcessN;
+    thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк у этого процесса
     
     //debugout(matrix, b, n);
 
     //порядок следования неизвестных
     for (int i = 0; i < n; i++)
-        seq[i] = i;
+        colseqMap[i] = i;
     
-    for (int i=0; i<n-1; i++) //прямой
+    for (int i=0; i<n; i++) //прямой ход гаусса - с последней строкой не надо
     {
-        k = i;
-        for (int j=i; j<n; j++)//с последней строкой не надо
-        {
-            if(fabs(matrix[i+k*n]) < fabs(matrix[i+j*n])) 
-                {
-                    k = j;
+        if (rank == (i % size)) {
+            col_max_id = i; //ищем наибольший элемент по строке
+
+            for (int j = i; j < n; j++)     //ищет только один поток
+            {
+                if (fabs(matrix[(i/size) * n + colseqMap[col_max_id]]) <
+                    fabs(matrix[(i/size) * n + colseqMap[j]])) {
+                    col_max_id = j;
                 }
+            }
+
+            buf = matrix[(i/size) * n + colseqMap[col_max_id]];
+            for (int j = 0; j < n; ++j) {
+                matrix[(i/size) * n + j] = matrix[(i/size) * n + j]/buf;
+            }
+            b[i/size] = b[i/size]/buf;
+
+
+            printf("\nPr #%d sand %d:", rank, i);
+            for (int j = 0; j < n; ++j) {
+                printf("%lf    ", matrix[(i/size) * n + j]);
+            }
+            printf("\n");
+            printf("Max col id: %d, value %lf. \n", colseqMap[col_max_id], matrix[(i/size) * n + colseqMap[col_max_id]]);
+
+
+
+            // отправка строки и элемента rvector
+            MPI_Bcast(matrix + (i / size) * n, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            MPI_Bcast(b + i / size, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+        } else {
+            //прием строки и элемента rvector
+            MPI_Bcast(recv_str, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            MPI_Bcast(&b_root, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
         }
+        MPI_Bcast(&col_max_id, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
 
-        col_swap(matrix, n, i, k);
 
-        //запоминаем порядок
-        buf = seq[i];
-        seq[i] = seq[k];
-        seq[k] = buf; 
-
-        for (int j=i+1; j<n; j++)
+        if (rank != (i%size))
         {
-            line_minus(matrix, b, n, j, i);
+            printf("\nPr #%d received:", rank);
+            for (int j = 0; j < n; j++)
+                printf("   %lf ", recv_str[j]);
+            printf("and %lf", b_root);
         }
+        printf("\n");
+
+        //типо меняем столбцы местами - запоминаем порядок
+
+
+
+        buf = colseqMap[i];
+        colseqMap[i] = colseqMap[col_max_id];
+        colseqMap[col_max_id] = buf;
+
+        printf("i=%d, cmi=%d : ", i, col_max_id);
+        for (int j = 0; j < n; ++j) {
+            printf("%d  ", colseqMap[j]);
+        }
+        printf("\n");
+
+
+        printf("starting minusing\n");
+
+        if (rank != (i%size))//почти все процессы вычитают полученную строку из своих
+        {
+            for (int j = 0; j < thisProcessN; ++j)
+            {
+                if (i <  j*size + rank)     //вычитаем только из последующих строк
+                {
+                    koeff = matrix[j * n + colseqMap[i]]; //коэффициент - так как отнормировали раньше, то просто соответствующий элемент матрицы
+                    for (int k = 0; k < n; k++){
+                        printf("%lf - %lf*%lf = %lf\n", matrix[j * n + k], koeff, recv_str[k], matrix[j * n + k] - koeff*recv_str[k]);
+                        matrix[j * n + k] -= koeff * recv_str[k];
+                    }
+                    b[j] -= koeff * b_root;
+                }
+            }
+        } else //а владелец еще и строки нормирует ее на элемент
+        {
+            buf = matrix[(i / size) * n + colseqMap[i]];
+            for (int j = 0; j < thisProcessN; ++j)
+            {
+                if (i/size < j)     //вычитаем только из последующих строк
+                {
+                    printf("cmi = %d", i);
+                    koeff = matrix[j * n + colseqMap[i]]; //коэффициент
+                    for (int k = i; k < n; k++)
+                        matrix[j * n + colseqMap[k]] -= koeff * matrix[(i / size) * n + colseqMap[k]];
+                    b[j] -= koeff * b[i / size];
+                }
+            }
+        }
+
+
+        for (int j = 0; j < thisProcessN; ++j) {
+            printf("Pr #%d, str %d:", rank, j);
+            for (int k = 0; k < n; ++k) {
+                printf("%lf    ", matrix[j*n + k]);
+            }
+            printf("\n");
+        }
+
     }
 
-    //debugout(matrix, b, n);
+
+
+
+
 
     //обратный ход
     for (int i=n-1; i>-1; i--)
     {
-        for (int j=0; j<i; j++)
-        {
-            line_minus(matrix, b, n, j, i);
-        }
+        buf = b[i/size];
+        MPI_Bcast(&buf, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+        if (rank != i % size)
+            for (int j = 0; j < thisProcessN; j++)
+            {
+                //i - номер строки во всей матрице, он же - номер столбца в котором вычетаем. j - номер строки в подматрице находящейся на процессе
+                if (j*size + rank < i)
+                    b[j] -= matrix[j*n+i]*buf;
+            };
     }
-    
 
+    printf("Answers of %d:", rank);
+
+    for (int i = 0; i < thisProcessN; ++i) {
+        printf("%lf   ", b[i]);
+    }
+    printf("\n");
+
+/*
     //debugout(matrix, b, n);
-    
+
     //ищем неизвестные
     for (int i = 0; i < n; i++)
     {
         b[i] = 1.0*b[i]/matrix[i + n*i];
         matrix[i + n*i] = 1;
     }
-    
+
     //debugout(matrix, b, n);
-    
+
     //восстанавливаем порядок
     for (int i = 0; i < n; i++)
         b_copy[seq[i]] = b[i];
     for (int i = 0; i < n; i++)
         b[i] = b_copy[i];
-    
+
     return 0;
+     */
 }

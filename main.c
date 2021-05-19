@@ -48,7 +48,7 @@ int main(int argc, char** argv)
         &&  k != 0)
         {
             thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк этому процессу
-            printf("Process #%d of %d\n", rank, size);
+            printf("\nProcess #%d of %d\n", rank, size);
             printf("I eat %d strings\n", thisProcessN);
             matrix = (double*)malloc(n*thisProcessN*sizeof(double));      //every task has only his strings
             printf("Initializing matrix...\n");
@@ -64,8 +64,8 @@ int main(int argc, char** argv)
     printf("Initializing right vector...\n");
     rvector = (double*)malloc(thisProcessN*sizeof(double));
     rvector_init(rvector, matrix, thisProcessN);
-    buf  = (int*)malloc(thisProcessN*sizeof(int));
-    buf2 = (double*)malloc(thisProcessN*sizeof(double));
+    buf  = (int*)malloc(n*sizeof(int));
+    buf2 = (double*)malloc(n*sizeof(double));
 
 
     printf("Starting Gauss SLE alg...\n");
