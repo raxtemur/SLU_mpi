@@ -60,19 +60,29 @@ int matrix_init(double *matrix, int n, int k, int rank, int size) //matrix, size
     return 0;
 }
 
-void rvector_init(double *b, double *matrix, int n)
+void rvector_init(double *b, double *matrix, int n, int rank, int size)
 {
+    int thisProcessN;
+    int debugMode = 0;
     for (int i=0; i<n; i++)// line
     {
         b[i] = 0;
     }
-    for (int k=0; k < (n-1)/2 + 1; k++) //column, seems like there is mistake in task
-    {
-        for (int i=0; i<n; i++)// line
+    thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк этому процессу
+    if (debugMode)
+        printf("N for this process: %d\n", thisProcessN);
+
+    for (int i = 0; i < thisProcessN; ++i) {
+        for (int k=0; k < (n-1)/2 + 1; k++) //column, seems like there is mistake in task
         {
-            b[i] += matrix[i + 2*k*n];
+            if (debugMode)
+                printf("rv %d: %lf + %lf\n", i, b[i], matrix[i*n + 2*k]);
+            b[i] += matrix[i*n + 2*k];
         }
+        if (debugMode)
+            printf("rv %d: %lf\n", i, b[i]);
     }
+
 }
 
 int matrix_read(double *matrix, int n, char *filename) //matrix, size, filename

@@ -63,7 +63,13 @@ int main(int argc, char** argv)
 
     printf("Initializing right vector...\n");
     rvector = (double*)malloc(thisProcessN*sizeof(double));
-    rvector_init(rvector, matrix, thisProcessN);
+    printf("P #%d r-vector: ", rank);
+    rvector_init(rvector, matrix, n, rank, size);
+    for (int i = 0; i < thisProcessN; ++i) {
+        printf("%lf   ", rvector[i]);
+    }
+    printf("\n");
+
     buf  = (int*)malloc(n*sizeof(int));
     buf2 = (double*)malloc(n*sizeof(double));
 

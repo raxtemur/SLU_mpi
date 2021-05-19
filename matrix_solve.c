@@ -46,6 +46,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
     int col_max_id;
     double buf, b_root, koeff;
     int thisProcessN;
+    int debugMode = 0;
     thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк у этого процесса
     
     //debugout(matrix, b, n);
@@ -73,13 +74,16 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
             }
             b[i/size] = b[i/size]/buf;
 
-
-            printf("\nPr #%d sand %d:", rank, i);
-            for (int j = 0; j < n; ++j) {
-                printf("%lf    ", matrix[(i/size) * n + j]);
+            if (debugMode)
+            {
+                printf("\nPr #%d sand %d:", rank, i);
+                for (int j = 0; j < n; ++j) {
+                    printf("%lf    ", matrix[(i/size) * n + j]);
+                }
+                printf("and %lf\n", b[i/size]);
+                printf("Max col id: %d, value %lf. \n", colseqMap[col_max_id], matrix[(i/size) * n + colseqMap[col_max_id]]);
             }
-            printf("\n");
-            printf("Max col id: %d, value %lf. \n", colseqMap[col_max_id], matrix[(i/size) * n + colseqMap[col_max_id]]);
+
 
 
 
@@ -94,14 +98,15 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
         MPI_Bcast(&col_max_id, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
 
 
-        if (rank != (i%size))
+        if (rank != (i%size) && debugMode)
         {
             printf("\nPr #%d received:", rank);
             for (int j = 0; j < n; j++)
                 printf("   %lf ", recv_str[j]);
             printf("and %lf", b_root);
+            printf("\n");
         }
-        printf("\n");
+
 
         //типо меняем столбцы местами - запоминаем порядок
 
@@ -111,14 +116,14 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
         colseqMap[i] = colseqMap[col_max_id];
         colseqMap[col_max_id] = buf;
 
-        printf("i=%d, cmi=%d : ", i, col_max_id);
-        for (int j = 0; j < n; ++j) {
-            printf("%d  ", colseqMap[j]);
+        if (debugMode) {
+            printf("i=%d, cmi=%d : ", i, col_max_id);
+            for (int j = 0; j < n; ++j) {
+                printf("%d  ", colseqMap[j]);
+            }
+            printf("\n");
+            printf("starting minusing\n");
         }
-        printf("\n");
-
-
-        printf("starting minusing\n");
 
         if (rank != (i%size))//почти все процессы вычитают полученную строку из своих
         {
@@ -128,7 +133,10 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
                 {
                     koeff = matrix[j * n + colseqMap[i]]; //коэффициент - так как отнормировали раньше, то просто соответствующий элемент матрицы
                     for (int k = 0; k < n; k++){
-                        printf("%lf - %lf*%lf = %lf\n", matrix[j * n + k], koeff, recv_str[k], matrix[j * n + k] - koeff*recv_str[k]);
+                        if (debugMode) {
+                            printf("%lf - %lf*%lf = %lf\n", matrix[j * n + k], koeff, recv_str[k],
+                                   matrix[j * n + k] - koeff * recv_str[k]);
+                        }
                         matrix[j * n + k] -= koeff * recv_str[k];
                     }
                     b[j] -= koeff * b_root;
@@ -141,7 +149,6 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
             {
                 if (i/size < j)     //вычитаем только из последующих строк
                 {
-                    printf("cmi = %d", i);
                     koeff = matrix[j * n + colseqMap[i]]; //коэффициент
                     for (int k = i; k < n; k++)
                         matrix[j * n + colseqMap[k]] -= koeff * matrix[(i / size) * n + colseqMap[k]];
@@ -150,21 +157,17 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
             }
         }
 
-
-        for (int j = 0; j < thisProcessN; ++j) {
-            printf("Pr #%d, str %d:", rank, j);
-            for (int k = 0; k < n; ++k) {
-                printf("%lf    ", matrix[j*n + k]);
+        if (debugMode) {
+            for (int j = 0; j < thisProcessN; ++j) {
+                printf("Pr #%d, str %d:", rank, j);
+                for (int k = 0; k < n; ++k) {
+                    printf("%lf    ", matrix[j * n + k]);
+                }
+                printf("and %lf\n", b[j]);
             }
-            printf("\n");
         }
 
     }
-
-
-
-
-
 
     //обратный ход
     for (int i=n-1; i>-1; i--)
@@ -180,7 +183,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
             };
     }
 
-    printf("Answers of %d:", rank);
+    printf("\nAnswers of %d:", rank);
 
     for (int i = 0; i < thisProcessN; ++i) {
         printf("%lf   ", b[i]);
