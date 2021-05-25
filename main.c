@@ -100,6 +100,11 @@ int main(int argc, char** argv)
     printf("Norm of nesvyazka is %10.3e\n", nesvyazka_norm(matrix, rvector, buf2, n));
     printf("Norm of pogreshnost is %lf\n", pogreshnost_norm(buf2, n));
 */
+    free(buf);
+    free(matrix);
+    free(rvector);
+    free(buf2);
+
     MPI_Finalize();
     return 0;
 }

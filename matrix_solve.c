@@ -48,7 +48,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
     int thisProcessN;
     int debugMode = 0;
     thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк у этого процесса
-    
+
     //debugout(matrix, b, n);
 
     //порядок следования неизвестных
@@ -95,7 +95,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
             MPI_Bcast(recv_str, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
             MPI_Bcast(&b_root, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
         }
-        MPI_Bcast(&col_max_id, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+        MPI_Bcast(&col_max_id, 1, MPI_INT, i % size, MPI_COMM_WORLD);
 
 
         if (rank != (i%size) && debugMode)
@@ -169,18 +169,27 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
 
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     //обратный ход
     for (int i=n-1; i>-1; i--)
     {
-        buf = b[i/size];
+        if (rank == i % size)
+            buf = b[i/size];
         MPI_Bcast(&buf, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
-        if (rank != i % size)
+
             for (int j = 0; j < thisProcessN; j++)
             {
                 //i - номер строки во всей матрице, он же - номер столбца в котором вычетаем. j - номер строки в подматрице находящейся на процессе
                 if (j*size + rank < i)
                     b[j] -= matrix[j*n+i]*buf;
-            };
+                if (debugMode)
+                {
+                    printf("Pr #%d received %lf from %d, and made str %d, r.-v.: %lf\n", rank, buf, i % size, j, b[j]);
+                }
+            }
+
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 
     printf("\nAnswers of %d:", rank);
