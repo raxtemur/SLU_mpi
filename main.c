@@ -10,18 +10,20 @@
 int main(int argc, char** argv)
 {
     int rank, size;
-
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);               //this process id
-    MPI_Comm_size(MPI_COMM_WORLD, &size);               // total number of processes
+    int debugMode = 1;
 
     int n, m, k;                                                                                                        //matrix size, site to output , formula
     int thisProcessN;
     char filename[64];
     double* matrix;
     double *rvector, *buf2;                                                                                                   //right-vector, buffer other issues
-    int *buf;                                                                                                           //?
-    
+    int *buf;                                                                                           //?
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);               //this process id
+    MPI_Comm_size(MPI_COMM_WORLD, &size);               // total number of processes
+
+
 
     double time_taken = 0;
     clock_t t = 0;                                                                                                      //cpu time
@@ -39,6 +41,7 @@ int main(int argc, char** argv)
             printf("Reading matrix...\n");
             matrix_read(matrix, n, filename);*/
             printf("Ne umeyu");
+            return -1;
         }
 
     else if (argc == 4                                                                                                  //scenario 2 - input from file
@@ -48,8 +51,11 @@ int main(int argc, char** argv)
         &&  k != 0)
         {
             thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк этому процессу
-            printf("\nProcess #%d of %d\n", rank, size);
-            printf("I eat %d strings\n", thisProcessN);
+            if (debugMode)
+            {
+                printf("\nProcess #%d of %d\n", rank, size);
+                printf("I eat %d strings\n", thisProcessN);
+            }
             matrix = (double*)malloc(n*thisProcessN*sizeof(double));      //every task has only his strings
             printf("Initializing matrix...\n");
             matrix_init(matrix, n, k, rank, size);
@@ -59,16 +65,22 @@ int main(int argc, char** argv)
         printf("arg error.\n");
         return -1;
     }
-
+    MPI_Barrier(MPI_COMM_WORLD);
 
     printf("Initializing right vector...\n");
     rvector = (double*)malloc(thisProcessN*sizeof(double));
-    printf("P #%d r-vector: ", rank);
     rvector_init(rvector, matrix, n, rank, size);
-    for (int i = 0; i < thisProcessN; ++i) {
-        printf("%lf   ", rvector[i]);
+
+    if (debugMode)
+    {
+        printf("P #%d r-vector: ", rank);
+        for (int i = 0; i < thisProcessN; ++i)
+        {
+            printf("%lf   ", rvector[i]);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+        printf("\n");
     }
-    printf("\n");
 
     buf  = (int*)malloc(n*sizeof(int));
     buf2 = (double*)malloc(n*sizeof(double));
@@ -100,11 +112,12 @@ int main(int argc, char** argv)
     printf("Norm of nesvyazka is %10.3e\n", nesvyazka_norm(matrix, rvector, buf2, n));
     printf("Norm of pogreshnost is %lf\n", pogreshnost_norm(buf2, n));
 */
-    free(buf);
-    free(matrix);
-    free(rvector);
-    free(buf2);
 
+
+    printf("\nPr #%d successfully ending his life\n", rank);
     MPI_Finalize();
+    printf("\nPr #%d successfully ended his life\n", rank);
+
+
     return 0;
 }

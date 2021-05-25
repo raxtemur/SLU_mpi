@@ -23,6 +23,7 @@ double fun(int k, int n, int i, int j) //num of fun, size, parametrs
 
 int matrix_init(double *matrix, int n, int k, int rank, int size) //matrix, size, num of formula
 {
+    int debugMode = 0;
     int thisProcessN;
     if (k < 1 || k > 4) 
     {
@@ -33,13 +34,16 @@ int matrix_init(double *matrix, int n, int k, int rank, int size) //matrix, size
 
     for (int i=0; i < thisProcessN; i++)
     {
-        printf("Pr #%d, i=%d, ie str=%d:   ", rank,i,size*i+rank);
+        if(debugMode)
+            printf("Pr #%d, i=%d, ie str=%d:   ", rank,i,size*i+rank);
         for (int j = 0; j < n; j++)
         {
             matrix[i*n+j] = fun(k, n, size*i+rank, j);
-            printf("%lf    ", matrix[i*n+j]);
+            if(debugMode)
+                printf("%lf    ", matrix[i*n+j]);
         }
-        printf("\n");
+        if(debugMode)
+            printf("\n");
 
     }
 
@@ -62,8 +66,8 @@ int matrix_init(double *matrix, int n, int k, int rank, int size) //matrix, size
 
 void rvector_init(double *b, double *matrix, int n, int rank, int size)
 {
-    int thisProcessN;
     int debugMode = 0;
+    int thisProcessN;
     for (int i=0; i<n; i++)// line
     {
         b[i] = 0;

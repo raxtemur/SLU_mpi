@@ -1,5 +1,5 @@
 CC=mpicc
-CFLAGS=-c
+CFLAGS=-c -O2
 
 all: a
 

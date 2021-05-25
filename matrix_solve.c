@@ -43,7 +43,7 @@ void debugout(double *matrix, double *b, int n)
 
 int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str, int rank, int size)
 {
-    int col_max_id;
+    int col_max_id = 0;
     double buf, b_root, koeff;
     int thisProcessN;
     int debugMode = 0;
@@ -54,7 +54,9 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
     //порядок следования неизвестных
     for (int i = 0; i < n; i++)
         colseqMap[i] = i;
-    
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     for (int i=0; i<n; i++) //прямой ход гаусса - с последней строкой не надо
     {
         if (rank == (i % size)) {
@@ -68,11 +70,15 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
                 }
             }
 
+
+
             buf = matrix[(i/size) * n + colseqMap[col_max_id]];
             for (int j = 0; j < n; ++j) {
                 matrix[(i/size) * n + j] = matrix[(i/size) * n + j]/buf;
+                recv_str[j] = matrix[(i/size) * n + j];
             }
             b[i/size] = b[i/size]/buf;
+            b_root = b[i/size];
 
             if (debugMode)
             {
@@ -83,20 +89,26 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
                 printf("and %lf\n", b[i/size]);
                 printf("Max col id: %d, value %lf. \n", colseqMap[col_max_id], matrix[(i/size) * n + colseqMap[col_max_id]]);
             }
-
-
-
-
             // отправка строки и элемента rvector
-            MPI_Bcast(matrix + (i / size) * n, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
-            MPI_Bcast(b + i / size, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            //MPI_Bcast(matrix + (i / size) * n, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            //MPI_Bcast(b + i / size, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            //printf("\nPr #%d и раз:", rank);
         } else {
             //прием строки и элемента rvector
-            MPI_Bcast(recv_str, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
-            MPI_Bcast(&b_root, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            //MPI_Bcast(recv_str, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            //MPI_Bcast(&b_root, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+            //printf("\nPr #%d и и раз:", rank);
         }
+        //MPI_Barrier(MPI_COMM_WORLD);
+        //printf("\nPr #%d раз:", rank);
+        MPI_Bcast(recv_str, n+1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+        //MPI_Barrier(MPI_COMM_WORLD);
+        //printf("\nPr #%d два:", rank);
+        MPI_Bcast(&b_root, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+        //MPI_Barrier(MPI_COMM_WORLD);
+        //printf("\nPr #%d три:", rank);
         MPI_Bcast(&col_max_id, 1, MPI_INT, i % size, MPI_COMM_WORLD);
-
+        //MPI_Barrier(MPI_COMM_WORLD);
 
         if (rank != (i%size) && debugMode)
         {
@@ -174,6 +186,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
     //обратный ход
     for (int i=n-1; i>-1; i--)
     {
+        MPI_Barrier(MPI_COMM_WORLD);
         if (rank == i % size)
             buf = b[i/size];
         MPI_Bcast(&buf, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
@@ -198,25 +211,4 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
         printf("%lf   ", b[i]);
     }
     printf("\n");
-
-/*
-    //debugout(matrix, b, n);
-
-    //ищем неизвестные
-    for (int i = 0; i < n; i++)
-    {
-        b[i] = 1.0*b[i]/matrix[i + n*i];
-        matrix[i + n*i] = 1;
-    }
-
-    //debugout(matrix, b, n);
-
-    //восстанавливаем порядок
-    for (int i = 0; i < n; i++)
-        b_copy[seq[i]] = b[i];
-    for (int i = 0; i < n; i++)
-        b[i] = b_copy[i];
-
-    return 0;
-     */
 }
