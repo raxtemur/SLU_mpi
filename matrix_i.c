@@ -68,11 +68,14 @@ void rvector_init(double *b, double *matrix, int n, int rank, int size)
 {
     int debugMode = 0;
     int thisProcessN;
-    for (int i=0; i<n; i++)// line
+
+    thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк этому процессу
+
+    for (int i=0; i<thisProcessN; i++)// line
     {
         b[i] = 0;
     }
-    thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк этому процессу
+
     if (debugMode)
         printf("N for this process: %d\n", thisProcessN);
 

@@ -10,7 +10,8 @@
 int main(int argc, char** argv)
 {
     int rank, size;
-    int debugMode = 1;
+    int debugMode = 0,
+            gatherAnswers = 1;
 
     int n, m, k;                                                                                                        //matrix size, site to output , formula
     int thisProcessN;
@@ -44,7 +45,7 @@ int main(int argc, char** argv)
             return -1;
         }
 
-    else if (argc == 4                                                                                                  //scenario 2 - input from file
+    else if (argc == 4                                                                                                  //scenario 2 - init
         && sscanf(argv[1], "%d", &n) 
 		&& sscanf(argv[2], "%d", &m) 
 		&& sscanf(argv[3], "%d", &k)
@@ -67,7 +68,7 @@ int main(int argc, char** argv)
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    printf("Initializing right vector...\n");
+    printf("P #%d initializing right vector...\n", rank);
     rvector = (double*)malloc(thisProcessN*sizeof(double));
     rvector_init(rvector, matrix, n, rank, size);
 
@@ -85,16 +86,55 @@ int main(int argc, char** argv)
     buf  = (int*)malloc(n*sizeof(int));
     buf2 = (double*)malloc(n*sizeof(double));
 
-
-    printf("Starting Gauss SLE alg...\n");
+    printf("P #%d starting Gauss SLE alg...\n", rank);
     t = clock();
     SLE_solve(matrix, rvector, n, buf, buf2, rank, size);
     t = clock() - t;
-/*
+
     time_taken = ((double)t)/CLOCKS_PER_SEC;
 
-    matrix_print(buf2, n, 1, m);//вывод полученных ответов
+    MPI_Barrier(MPI_COMM_WORLD);
+    //matrix_print(buf2, 1, n, m, rank, size);//вывод полученных ответов
+    if (gatherAnswers)
+    {
+        free(buf2);
+        if (rank == 0)
+        {
+            buf2 = (double*)malloc(m*size*sizeof(double));
+            printf("Gathering answers\n");
+        }
 
+        MPI_Gather(rvector, m, MPI_DOUBLE, buf2, m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == 0)
+        {
+            for (int i = 0; (i < m * size); ++i) {
+                printf("%lf   ", buf2[i]);
+            }
+            printf("\n");
+        }
+
+    }
+    else
+    {
+        for (int i = 0; i < size; ++i)
+        {
+            MPI_Barrier(MPI_COMM_WORLD);
+            if (rank == i)
+            {
+                printf("P #%d answers:\n", rank);
+                matrix_print(rvector, thisProcessN, 1, m, rank, size);
+                /*for (int i = 0; (i < thisProcessN)&&(i<m); ++i) {
+                    printf("%lf   ", rvector[i]);
+                }*/
+                printf("\n");
+            }
+
+        }
+    }
+
+
+    MPI_Barrier(MPI_COMM_WORLD);
     printf("Time spent: %lf seconds (time)\n", (double)(time(NULL)-start_t));
     printf("CPU time %lf senods (clock)\n", (double)time_taken);
 
@@ -102,21 +142,24 @@ int main(int argc, char** argv)
     //переинициализация, по требованиям и для подсчета нормы несвязки
     if (k==0)
     {
-        matrix_read(matrix, n, filename);
+        printf("Ne umeju, skazal je!\n");
+        //matrix_read(matrix, n, filename);
     }
     else
     {
-        matrix_init(matrix, n, k); 
+        matrix_init(matrix, n, k, rank, size);
     }
-    rvector_init(rvector, matrix, n);
-    printf("Norm of nesvyazka is %10.3e\n", nesvyazka_norm(matrix, rvector, buf2, n));
-    printf("Norm of pogreshnost is %lf\n", pogreshnost_norm(buf2, n));
-*/
 
 
-    printf("\nPr #%d successfully ending his life\n", rank);
+
+    //printf("Norm of nesvyazka is %10.3e\n", nesvyazka_norm(matrix, rvector, buf2, n));
+    //printf("Norm of pogreshnost is %lf\n", pogreshnost_norm(buf2, n));
+
+
+
+    //printf("\nPr #%d successfully ending his life\n", rank);
     MPI_Finalize();
-    printf("\nPr #%d successfully ended his life\n", rank);
+    //printf("\nPr #%d successfully ended his life\n", rank);
 
 
     return 0;

@@ -101,7 +101,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
         }
         //MPI_Barrier(MPI_COMM_WORLD);
         //printf("\nPr #%d раз:", rank);
-        MPI_Bcast(recv_str, n+1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
+        MPI_Bcast(recv_str, n, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
         //MPI_Barrier(MPI_COMM_WORLD);
         //printf("\nPr #%d два:", rank);
         MPI_Bcast(&b_root, 1, MPI_DOUBLE, i % size, MPI_COMM_WORLD);
@@ -204,11 +204,14 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
 
         MPI_Barrier(MPI_COMM_WORLD);
     }
+    if (debugMode)
+    {
+        printf("\nAnswers of %d:", rank);
 
-    printf("\nAnswers of %d:", rank);
-
-    for (int i = 0; i < thisProcessN; ++i) {
-        printf("%lf   ", b[i]);
+        for (int i = 0; i < thisProcessN; ++i) {
+            printf("%lf   ", b[i]);
+        }
+        printf("\n");
     }
-    printf("\n");
+    return 0;
 }
