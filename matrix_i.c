@@ -23,7 +23,7 @@ double fun(int k, int n, int i, int j) //num of fun, size, parametrs
 
 int matrix_init(double *matrix, int n, int k, int rank, int size) //matrix, size, num of formula
 {
-    int debugMode = 0;
+    int debugMode = 1;
     int thisProcessN;
     if (k < 1 || k > 4) 
     {

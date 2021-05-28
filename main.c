@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 {
     int rank, size;
     int debugMode = 0,
-            gatherAnswers = 1;
+        gatherAnswers = 1;
 
     int n, m, k;                                                                                                        //matrix size, site to output , formula
     int thisProcessN;
@@ -19,6 +19,7 @@ int main(int argc, char** argv)
     double* matrix;
     double *rvector, *buf2;                                                                                                   //right-vector, buffer other issues
     int *buf;                                                                                           //?
+    MPI_Status status;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);               //this process id
@@ -27,8 +28,8 @@ int main(int argc, char** argv)
 
 
     double time_taken = 0;
-    clock_t t = 0;                                                                                                      //cpu time
-    time_t start_t = time(NULL);                                                                                  //real time
+    double t = 0;                                                                                                      //cpu time
+    //time_t start_t = time(NULL);                                                                                  //real time
 
 
     if (argc == 5                                                                                                       //scenario 1 - input from file
@@ -69,7 +70,7 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     printf("P #%d initializing right vector...\n", rank);
-    rvector = (double*)malloc(thisProcessN*sizeof(double));
+    rvector = (double*)malloc(thisProcessN*sizeof(double));     //выделим чуть больше - потом пригодится
     rvector_init(rvector, matrix, n, rank, size);
 
     if (debugMode)
@@ -87,56 +88,44 @@ int main(int argc, char** argv)
     buf2 = (double*)malloc(n*sizeof(double));
 
     printf("P #%d starting Gauss SLE alg...\n", rank);
-    t = clock();
+    t = MPI_Wtime();
     SLE_solve(matrix, rvector, n, buf, buf2, rank, size);
-    t = clock() - t;
+    t = MPI_Wtime() - t;
 
-    time_taken = ((double)t)/CLOCKS_PER_SEC;
+
 
     MPI_Barrier(MPI_COMM_WORLD);
-    //matrix_print(buf2, 1, n, m, rank, size);//вывод полученных ответов
-    if (gatherAnswers)
+
+    //ща будет нормальная сборка ответов
+    if (rank == 0)
     {
-        free(buf2);
-        if (rank == 0)
+        printf("\nGatheting answers...\n");
+        for (int j = 0; j < thisProcessN; ++j)
         {
-            buf2 = (double*)malloc(m*size*sizeof(double));
-            printf("Gathering answers\n");
+            buf2[j*size] = rvector[j];
         }
-
-        MPI_Gather(rvector, m, MPI_DOUBLE, buf2, m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (rank == 0)
+        for (int i = 1; i < size; ++i)
         {
-            for (int i = 0; (i < m * size); ++i) {
-                printf("%lf   ", buf2[i]);
+            thisProcessN = (n/size) + (i<(n%size)?1:0);
+            MPI_Recv(rvector, thisProcessN, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &status);
+            for (int j = 0; j < thisProcessN; ++j)
+            {
+                buf2[j*size + i] = rvector[j];
             }
-            printf("\n");
         }
-
+        printf("Answers:\n");
+        matrix_print(buf2, 1, n, m, rank, size);
+        printf("\n");
     }
     else
     {
-        for (int i = 0; i < size; ++i)
-        {
-            MPI_Barrier(MPI_COMM_WORLD);
-            if (rank == i)
-            {
-                printf("P #%d answers:\n", rank);
-                matrix_print(rvector, thisProcessN, 1, m, rank, size);
-                /*for (int i = 0; (i < thisProcessN)&&(i<m); ++i) {
-                    printf("%lf   ", rvector[i]);
-                }*/
-                printf("\n");
-            }
-
-        }
+        MPI_Send(rvector, thisProcessN, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
     }
 
 
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("Time spent: %lf seconds (time)\n", (double)(time(NULL)-start_t));
-    printf("CPU time %lf senods (clock)\n", (double)time_taken);
+    if (rank == 0) printf("Time spent: %lf seconds (time)\n", t);
+    //printf("P#%d CPU time %lf senods (clock)\n", rank, (double)time_taken);
 
 
     //переинициализация, по требованиям и для подсчета нормы несвязки
