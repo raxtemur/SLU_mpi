@@ -70,7 +70,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
             }
 
 
-
+            //запоминаем  i/size - номер строки, i%size - номер потока
             buf = matrix[(i/size) * n + colseqMap[col_max_id]];
             for (int j = 0; j < n; ++j) {
                 matrix[(i/size) * n + j] = matrix[(i/size) * n + j]/buf;

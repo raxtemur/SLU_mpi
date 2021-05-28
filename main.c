@@ -70,7 +70,7 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     printf("P #%d initializing right vector...\n", rank);
-    rvector = (double*)malloc(thisProcessN*sizeof(double));     //выделим чуть больше - потом пригодится
+    rvector = (double*)malloc(thisProcessN*sizeof(double));
     rvector_init(rvector, matrix, n, rank, size);
 
     if (debugMode)
@@ -97,6 +97,7 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     //ща будет нормальная сборка ответов
+    //better than any MPI_Gather
     if (rank == 0)
     {
         printf("\nGatheting answers...\n");
@@ -141,14 +142,20 @@ int main(int argc, char** argv)
 
 
 
-    //printf("Norm of nesvyazka is %10.3e\n", nesvyazka_norm(matrix, rvector, buf2, n));
-    //printf("Norm of pogreshnost is %lf\n", pogreshnost_norm(buf2, n));
+
+    if (rank == 0) //0 - выводит и один считает погрешность - он трудоголик(нельзя же все оптимизировать), остальным не помешало бы скинуться на невязку
+    {
+        printf("Norm of nesvyazka is %10.3e\n", nesvyazka_norm(matrix, rvector, buf2, n, rank, size));
+        printf("Norm of pogreshnost is %lf\n", pogreshnost_norm(buf2, n));
+    }
+    else
+    {
+        nesvyazka_norm(matrix, rvector, buf2, n, rank, size);
+    }
 
 
 
-    //printf("\nPr #%d successfully ending his life\n", rank);
     MPI_Finalize();
-    //printf("\nPr #%d successfully ended his life\n", rank);
 
 
     return 0;
