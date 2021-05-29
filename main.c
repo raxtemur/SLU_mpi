@@ -18,7 +18,7 @@ int main(int argc, char** argv)
     char filename[64];
     double* matrix;
     double *rvector, *buf2;                                                                                                   //right-vector, buffer other issues
-    int *buf;                                                                                           //?
+    int *colseqMap;                                                                                           //?
     MPI_Status status;
 
     MPI_Init(&argc, &argv);
@@ -84,12 +84,12 @@ int main(int argc, char** argv)
         printf("\n");
     }
 
-    buf  = (int*)malloc(n*sizeof(int));
+    colseqMap  = (int*)malloc(n*sizeof(int));
     buf2 = (double*)malloc(n*sizeof(double));
 
     printf("P #%d starting Gauss SLE alg...\n", rank);
     t = MPI_Wtime();
-    SLE_solve(matrix, rvector, n, buf, buf2, rank, size);
+    SLE_solve(matrix, rvector, n, colseqMap, buf2, rank, size);
     t = MPI_Wtime() - t;
 
 
@@ -111,7 +111,7 @@ int main(int argc, char** argv)
             MPI_Recv(rvector, thisProcessN, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &status);
             for (int j = 0; j < thisProcessN; ++j)
             {
-                buf2[j*size + i] = rvector[j];
+                buf2[colseqMap[j*size + i]] = rvector[j];  //учитываем, что на n-ом месте стоит значение colseqMap[n]-ой неизвестной
             }
         }
         printf("Answers:\n");

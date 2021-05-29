@@ -47,6 +47,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
     double buf, b_root, koeff;
     int thisProcessN;
     int debugMode = 0;
+    if (n>10) debugMode = 0; //на всякий случай
     thisProcessN = (n/size) + (rank<(n%size)?1:0); //сколько строк у этого процесса
 
     //debugout(matrix, b, n);
@@ -202,5 +203,7 @@ int SLE_solve(double *matrix, double *b, int n, int *colseqMap, double *recv_str
         }
         printf("\n");
     }
+
+
     return 0;
 }
